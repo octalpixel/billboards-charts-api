@@ -1,8 +1,9 @@
 
 
 import fetch from 'node-fetch';
-import { parse as htmlParser } from 'node-html-parser';
-import { IBBCharts } from './interfaces/IBBCharts';
+import * as cheerio from 'cheerio'
+import { parse, stringify } from 'flatted';
+import { IBBCharts, IChartListing } from './interfaces/IBBCharts';
 
 
 
@@ -10,7 +11,8 @@ class BillBoardParser {
 
 
 
-    private CHART_URL = 'https://www.billboard.com/charts'
+    private BB_BASE_URL = 'https://www.billboard.com'
+    private CHART_URL = `${this.BB_BASE_URL}/charts`
 
     constructor() { }
 
@@ -47,6 +49,20 @@ class BillBoardParser {
     }
 
 
+
+
+    private parseChartTitle(parentElement: Cheerio) {
+
+        return parentElement.find('.charts-grid__title').text().trim();
+
+    }
+    private parseChartLink(parentElement: Cheerio) {
+        return parentElement.attr('href').trim();
+    }
+    private parseChartImage(parentElement: Cheerio) {
+        return parentElement.find('.charts-grid__image').attr('src')
+    }
+
     async parseCharts() {
 
 
@@ -60,19 +76,33 @@ class BillBoardParser {
         }
 
 
-        let parsedHTML = htmlParser(chartHTML)
+        let $ = cheerio.load(chartHTML)
 
 
-        let summa = parsedHTML.childNodes[0].childNodes.filter(x => {
-            if ((x.nodeType == 1 && x.tagName == "body")) {
+        let chartlisting: IBBCharts[] = []
 
-                return x.toString()
-            }
+
+        // need to parse, the first stuff
+
+        $('.charts-grid').children('.charts-grid__block-wrapper').map((i, item) => {
+
+            let dataElement = $(item).find('a')
+
+            let link = `${this.BB_BASE_URL}${this.parseChartLink(dataElement)}`
+
+            let title = this.parseChartTitle(dataElement)
+
+            let img = this.parseChartImage(dataElement)
+
+            let chart = { title, link, img }
+
+            chartlisting = [...chartlisting, chart]
 
         })
 
 
-        return summa
+
+        return chartlisting
         // console.log(JSON.stringify(parsedHTML, null, 2));
 
 
@@ -87,7 +117,65 @@ class BillBoardParser {
     }
 
 
-    async parseChartList(url: string) { }
+    async parseChartList(url: string) {
+
+        let chartListingHTML = await this.getHTML(url);
+
+        // return chartListingHTML;
+
+        // the first one
+
+
+        //get the llist
+
+        const $ = cheerio.load(chartListingHTML);
+
+
+        let chartTitleListing: IChartListing[] = []
+
+
+
+        // There are few edges cases here: considers
+        let rankOneElement = $('.chart-number-one')
+
+        let rankOneListing: IChartListing = {
+            title: rankOneElement.find('.chart-number-one__info  .chart-number-one__title').text().trim(),
+            artist: rankOneElement.find('.chart-number-one__info .chart-number-one__artist').text().trim(),
+            thumbnail: JSON.parse(rankOneElement.find('.chart-video__wrapper').attr('data-brightcove-data'))['video_image'],
+            rank: "1"
+
+        }
+
+
+        chartTitleListing.push(rankOneListing)
+
+
+
+
+
+        $('.chart-details .chart-list').children('.chart-list-item').map((i, item) => {
+
+            let dataElement = $(item)
+
+            let rank = dataElement.find('.chart-list-item__rank').text()
+
+            let title = dataElement.find('.chart-list-item__title-text').text();
+
+            let artist = dataElement.find('.chart-list-item__artist').text();
+
+            let thumbnail = dataElement.find('.chart-list-item__image-wrapper img.chart-list-item__image').attr('data-src')
+
+            let listing: IChartListing = { title, artist, thumbnail, rank }
+
+            chartTitleListing = [...chartTitleListing, listing]
+
+        })
+
+
+        return chartTitleListing;
+
+
+    }
 
 
 }

@@ -22,7 +22,13 @@ const express_1 = __importDefault(require("express"));
 const app = express_1.default();
 app.get('/', (req, res) => __awaiter(this, void 0, void 0, function* () {
     let content = yield BillBoardParser_1.default.parseCharts();
-    console.log(content);
+    // console.log(content);
+    return res.json(content);
+}));
+app.get('/listing', (req, res) => __awaiter(this, void 0, void 0, function* () {
+    let link = 'https://www.billboard.com/charts/latin-songs';
+    let content = yield BillBoardParser_1.default.parseChartList(link);
+    // console.log(content);
     return res.json(content);
 }));
 app.listen(3030, () => {

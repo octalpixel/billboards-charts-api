@@ -17,12 +17,28 @@ app.get('/', async (req, res) => {
 
 
     let content = await bbParser.parseCharts()
-    console.log(content);
+    // console.log(content);
 
 
     return res.json(content);
 
 })
+
+
+
+app.get('/listing', async (req, res) => {
+
+
+    let link = 'https://www.billboard.com/charts/latin-songs'
+    let content = await bbParser.parseChartList(link)
+    // console.log(content);
+
+
+    return res.json(content);
+
+})
+
+
 
 
 

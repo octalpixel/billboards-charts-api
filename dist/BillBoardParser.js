@@ -10,12 +10,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_fetch_1 = __importDefault(require("node-fetch"));
-const node_html_parser_1 = require("node-html-parser");
+const cheerio = __importStar(require("cheerio"));
 class BillBoardParser {
     constructor() {
-        this.CHART_URL = 'https://www.billboard.com/charts';
+        this.BB_BASE_URL = 'https://www.billboard.com';
+        this.CHART_URL = `${this.BB_BASE_URL}/charts`;
     }
     getHTML(url) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -41,6 +49,15 @@ class BillBoardParser {
             }
         });
     }
+    parseChartTitle(parentElement) {
+        return parentElement.find('.charts-grid__title').text().trim();
+    }
+    parseChartLink(parentElement) {
+        return parentElement.attr('href').trim();
+    }
+    parseChartImage(parentElement) {
+        return parentElement.find('.charts-grid__image').attr('src');
+    }
     parseCharts() {
         return __awaiter(this, void 0, void 0, function* () {
             let chartHTML = yield this.getHTML(this.CHART_URL);
@@ -49,13 +66,18 @@ class BillBoardParser {
                 // There isnt anything to show
                 // return charts
             }
-            let parsedHTML = node_html_parser_1.parse(chartHTML);
-            let summa = parsedHTML.childNodes[0].childNodes.filter(x => {
-                if ((x.nodeType == 1 && x.tagName == "body")) {
-                    return x.toString();
-                }
+            let $ = cheerio.load(chartHTML);
+            let chartlisting = [];
+            // need to parse, the first stuff
+            $('.charts-grid').children('.charts-grid__block-wrapper').map((i, item) => {
+                let dataElement = $(item).find('a');
+                let link = `${this.BB_BASE_URL}${this.parseChartLink(dataElement)}`;
+                let title = this.parseChartTitle(dataElement);
+                let img = this.parseChartImage(dataElement);
+                let chart = { title, link, img };
+                chartlisting = [...chartlisting, chart];
             });
-            return summa;
+            return chartlisting;
             // console.log(JSON.stringify(parsedHTML, null, 2));
             // Parse hero title
             // parse normal blocks
@@ -63,7 +85,33 @@ class BillBoardParser {
         });
     }
     parseChartList(url) {
-        return __awaiter(this, void 0, void 0, function* () { });
+        return __awaiter(this, void 0, void 0, function* () {
+            let chartListingHTML = yield this.getHTML(url);
+            // return chartListingHTML;
+            // the first one
+            //get the llist
+            const $ = cheerio.load(chartListingHTML);
+            let chartTitleListing = [];
+            // There are few edges cases here: considers
+            let rankOneElement = $('.chart-number-one');
+            let rankOneListing = {
+                title: rankOneElement.find('.chart-number-one__info  .chart-number-one__title').text().trim(),
+                artist: rankOneElement.find('.chart-number-one__info .chart-number-one__artist').text().trim(),
+                thumbnail: JSON.parse(rankOneElement.find('.chart-video__wrapper').attr('data-brightcove-data'))['video_image'],
+                rank: "1"
+            };
+            chartTitleListing.push(rankOneListing);
+            $('.chart-details .chart-list').children('.chart-list-item').map((i, item) => {
+                let dataElement = $(item);
+                let rank = dataElement.find('.chart-list-item__rank').text();
+                let title = dataElement.find('.chart-list-item__title-text').text();
+                let artist = dataElement.find('.chart-list-item__artist').text();
+                let thumbnail = dataElement.find('.chart-list-item__image-wrapper img.chart-list-item__image').attr('data-src');
+                let listing = { title, artist, thumbnail, rank };
+                chartTitleListing = [...chartTitleListing, listing];
+            });
+            return chartTitleListing;
+        });
     }
 }
 exports.default = new BillBoardParser();
